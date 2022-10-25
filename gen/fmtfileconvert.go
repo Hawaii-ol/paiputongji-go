@@ -40,7 +40,7 @@ func (conv JsonToProtoConvertor) writeIndentedLine(content string) {
 	conv.writer.Write([]byte(whitespaces + content + "\n"))
 }
 
-func (conv JsonToProtoConvertor) Convert(jsonFile io.Reader, protoFile io.Writer) {
+func (conv JsonToProtoConvertor) Convert(jsonFile io.Reader, protoFile io.Writer) error {
 	conv.indent = 0
 	conv.writer = protoFile
 	// write syntax info
@@ -52,7 +52,7 @@ func (conv JsonToProtoConvertor) Convert(jsonFile io.Reader, protoFile io.Writer
 	var root liqiRootWrapper
 	decoder := jsoniter.NewDecoder(jsonFile)
 	if err := decoder.Decode(&root); err != nil {
-		log.Panic(err)
+		return err
 	}
 	// map returns keys in a random order, need to sort them first
 	definitions := root.Nested.Lq.Nested
@@ -61,6 +61,7 @@ func (conv JsonToProtoConvertor) Convert(jsonFile io.Reader, protoFile io.Writer
 	for _, name := range keys {
 		conv.parseItem(name, definitions[name].(map[string]interface{}))
 	}
+	return nil
 }
 
 func sortedMapKeys(m map[string]interface{}) []string {

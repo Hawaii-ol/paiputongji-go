@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>牌谱统计</title>
+    <link rel="stylesheet" href="res/paipu.css" />
+</head>
+<body>
+    <div class="title">
+        <h1>{{ if ne .Me nil }}{{ .Me.Nickname }} 的{{ end }}牌谱统计</h1>
+    </div>
+    <div class="paipu">
+        <hr/>
+        <div><h2>牌谱</h2></div>
+        <div class="date-selector">
+            <span>开始日期 <input id="startdate" type="date"/></span>
+            <span>结束日期 <input id="enddate" type="date"></span>
+            <button type="button" name="submit">确定</button>
+            <button type="button" name="reset">重置</button>
+        </div>
+        <div>
+            <table id="paipu">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>玩家一</th>
+                        <th>玩家二</th>
+                        <th>玩家三</th>
+                        <th>玩家四</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range $_, $paipu := .PaipuList }}
+                        <tr>
+                            <td><span>
+                                <a class="time" href="{{ print $.URLPrefix $paipu.Uuid }}" target="_blank">{{ $paipu.Time.Format "2006-01-02 15:04" }}</a>
+                            </span></td>
+                            {{ range $_, $result := $paipu.Result }}
+                                <td><span>{{ $result.Name }}</span>
+                                {{ if lt $result.Score 0 }}
+                                    <span class="score-hakoshita">{{ $result.Score }}</span>
+                                {{ else }}
+                                    <span class="score">{{ $result.Score }}</span>
+                                {{ end }}
+                                </td>
+                            {{ end }}
+                        </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="summary">
+        <hr/>
+        <div><h2>统计</h2></div>
+        <div>
+            <table id="summary">
+                <thead>
+                    <tr>
+                        <th>玩家</th>
+                        <th>总场次</th>
+                        <th>总得失点</th>
+                        <th>平均顺位</th>
+                        <th>一位率</th>
+                        <th>二位率</th>
+                        <th>三位率</th>
+                        <th>四位率</th>
+                        <th>被飞次数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range $_, $player := .Stats }}
+                        <tr>
+                            <td>{{ $player.Name }}</td>
+                            <td>{{ $player.GamePlayed }}</td>
+                            <td>{{ $player.Accum }}</td>
+                            <td>{{ printf "%.3f" $player.AvgJuni }}</td>
+                            <td>{{ percentage ($player.JuniRitsu 0) 2 }}</td>
+                            <td>{{ percentage ($player.JuniRitsu 1) 2 }}</td>
+                            <td>{{ percentage ($player.JuniRitsu 2) 2 }}</td>
+                            <td>{{ percentage ($player.JuniRitsu 3) 2 }}</td>
+                            <td>{{ $player.Hakoshita }}</td>
+                        </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="foot"></div>
+    <script type="text/javascript" src="res/moment.js"></script>
+    <script type="text/javascript" src="res/jquery-3.6.1.min.js"></script>
+    <script type="text/javascript" src="res/paipu.js" ></script>
+</body>
+</html>

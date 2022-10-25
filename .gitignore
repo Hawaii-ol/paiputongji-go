@@ -2,4 +2,5 @@
 build/
 liqi.proto
 liqi.pb
+index.html
 *.har

@@ -1,7 +1,6 @@
 package paiputongji
 
 import (
-	"io/ioutil"
 	"os"
 	"paiputongji/gen"
 	"path/filepath"
@@ -23,7 +22,7 @@ func RegistryDescriptor() (protoreflect.FileDescriptor, error) {
 		return nil, err
 	}
 	pbPath := filepath.Join(filepath.Dir(exe), gen.DESCRIPTOR_FILENAME)
-	pbData, err := ioutil.ReadFile(pbPath)
+	pbData, err := os.ReadFile(pbPath)
 	if err != nil {
 		return nil, err
 	}

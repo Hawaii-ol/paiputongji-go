@@ -7,12 +7,15 @@ else
 endif
 
 main:
-	go build -o $(BLDPATH)/$@$(EXEEXT) $(CMDPATH)/$@/$@.go
+	go build -o $(BLDPATH)/paiputongji$(EXEEXT) $(CMDPATH)/$@/$@.go
+	@echo Copying resource files into $(BLDPATH)/...
+	@cp -r res $(BLDPATH)/
+	@rm -f $(BLDPATH)/template.html
 
 genmeta:
 	go build -o $(BLDPATH)/$@$(EXEEXT) $(CMDPATH)/$@/$@.go
 	@$(BLDPATH)/$@$(EXEEXT)
-	@mv liqi/liqi.pb $(BLDPATH)
+	@cp liqi/liqi.pb $(BLDPATH)
 
 goinstall:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
@@ -21,4 +24,4 @@ all: goinstall genmeta main
 
 .PHONY: clean
 clean:
-	@rm -rf $(BLDPATH)/ liqi/liqi.proto
+	@rm -rf $(BLDPATH) liqi/liqi.proto

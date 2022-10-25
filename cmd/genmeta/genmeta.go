@@ -8,31 +8,26 @@ import (
 	"paiputongji/gen"
 )
 
-func genProtoFile() {
+func genProtoFile() error {
 	var conv gen.JsonToProtoConvertor
 	jsonFile, err := os.Open(gen.JsonPath)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	defer jsonFile.Close()
 	protoFile, err := os.Create(gen.ProtoPath)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	defer func() {
-		jsonFile.Close()
-		protoFile.Close()
-		if p := recover(); p != nil {
-			os.Remove(gen.ProtoPath)
-			panic(p)
-		}
-	}()
-	conv.Convert(jsonFile, protoFile)
+	defer protoFile.Close()
+	return conv.Convert(jsonFile, protoFile)
 }
 
 func main() {
-	// Generate `liqi.proto` file if not exists first
-	if !gen.CheckProtoExists() {
-		genProtoFile()
+	// Always re-generate `liqi.proto` to make sure it's the latest
+	fmt.Printf("Converting %s to %s...\n", gen.JSON_FILENAME, gen.PROTO_FILENAME)
+	if err := genProtoFile(); err != nil {
+		log.Fatal(err)
 	}
 	if compiler, err := gen.CompilerExecutable(); err != nil {
 		log.Fatal(err)
@@ -43,7 +38,7 @@ func main() {
 			fmt.Sprintf("--go_out=%s", gen.RootDir),
 			gen.ProtoPath,
 		)
-		fmt.Printf("Compiling %s ...\n", gen.META_FILENAME)
+		fmt.Printf("Compiling %s...\n", gen.META_FILENAME)
 		out, err := cmd.CombinedOutput()
 		os.Stdout.Write(out)
 		if err != nil {
@@ -55,7 +50,7 @@ func main() {
 			fmt.Sprintf("-o%s", gen.DescriptorPath),
 			gen.ProtoPath,
 		)
-		fmt.Printf("Compiling descriptor %s ...\n", gen.DESCRIPTOR_FILENAME)
+		fmt.Printf("Compiling descriptor %s...\n", gen.DESCRIPTOR_FILENAME)
 		out, err = cmd.CombinedOutput()
 		os.Stdout.Write(out)
 		if err != nil {
