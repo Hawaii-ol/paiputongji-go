@@ -1951,7 +1951,8 @@
                         "nickname_setting": {
                             "type": "NicknameSetting",
                             "id": 5
-                        }
+                        },
+                        "allow_modify_nickname": { "type": "bool", "id": 6 }
                     }
                 },
                 "NicknameSetting": {

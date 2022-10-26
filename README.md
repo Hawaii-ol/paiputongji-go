@@ -20,12 +20,14 @@
 
 项目支持make构建，可用的目标如下
 
+`make all`: 默认目标，=`make goinstall genmeta main update`
+
 `make goinstall`: 执行`go install`命令安装编译proto文件所需的相关程序，需要网络
 
 `make genmeta`: 根据liqi.json中的信息生成对应的liqi.proto和liqi.pb.go文件
 
-`make main`: 默认目标，生成可执行程序paiputongji，需要前置目标`make goinstall`和`make genmeta`
+`make main`: 生成主程序paiputongji，需要前置目标`make goinstall`和`make genmeta`
 
-`make all`: =`make goinstall genmeta main`
+`make update`: 生成update程序，用于更新liqi.json
 
 `make clean`: 清理build目录和liqi.proto等文件

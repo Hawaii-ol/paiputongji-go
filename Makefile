@@ -6,6 +6,8 @@ else
 	EXEEXT=
 endif
 
+all: goinstall genmeta main update
+
 main:
 	go build -o $(BLDPATH)/paiputongji$(EXEEXT) $(CMDPATH)/$@/$@.go
 	@echo Copying resource files into $(BLDPATH)/...
@@ -20,7 +22,8 @@ genmeta:
 goinstall:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 
-all: goinstall genmeta main
+update:
+	go build -o $(BLDPATH)/$@$(EXEEXT) $(CMDPATH)/$@/$@.go
 
 .PHONY: clean
 clean:
