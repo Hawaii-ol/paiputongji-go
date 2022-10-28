@@ -1,22 +1,25 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
 	"os"
 	"os/exec"
 	. "paiputongji"
+	"paiputongji/liqi"
 	"path/filepath"
 	"runtime"
 )
 
 const MAJSOUL_PAIPU_URL = "https://game.maj-soul.net/1/?paipu="
+const TOKEN_FILENAME = "access_token"
 
 type htmlTemplateData struct {
-	PaipuList []Paipu
+	PaipuList []*Paipu
 	Stats     []PlayerStats
-	Me        *AccountBrief
+	Me        *liqi.Account
 	URLPrefix string
 }
 
@@ -62,24 +65,61 @@ func openbrowser(url string) {
 	}
 }
 
+func saveAccessToken(token string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	p := filepath.Join(filepath.Dir(exe), TOKEN_FILENAME)
+	return os.WriteFile(p, []byte(token), 0666)
+}
+
+func loadAccessToken() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	p := filepath.Join(filepath.Dir(exe), TOKEN_FILENAME)
+	if token, err := os.ReadFile(p); err != nil {
+		return "", err
+	} else {
+		return string(token), nil
+	}
+}
+
+func deleteAccessToken() error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	p := filepath.Join(filepath.Dir(exe), TOKEN_FILENAME)
+	return os.Remove(p)
+}
+
 func main() {
-	if len(os.Args) == 2 {
-		paipu, me, err := ParseHARToPaipu(os.Args[1])
+	var paipu []*Paipu
+	var me *liqi.Account
+	var err error
+	var harFlag = flag.String("har", "", "HAR文件路径")
+	flag.Parse()
+
+	if len(os.Args) == 1 {
+		paipu, me = InteractiveMode()
+	} else if *harFlag != "" {
+		paipu, me, err = ParseHARToPaipu(*harFlag)
 		if err != nil {
 			log.Fatal(err)
 		}
+	} else {
+		fmt.Printf("Usage: %s [--har HARfile]\n", filepath.Base(os.Args[0]))
+		fmt.Println("未传递参数时将启动交互式客户端")
+		fmt.Println("传递--har选项时，将解析对应的HAR文件。")
+		os.Exit(0)
+	}
+	fmt.Printf("共查询到%d条记录。\n", len(paipu))
+	if len(paipu) > 0 {
 		playerStats := Analyze(paipu)
-		for _, player := range playerStats {
-			fmt.Printf("玩家：%s\n", player.Name)
-			fmt.Printf("总场次：%d\n", player.GamePlayed)
-			fmt.Printf("总得失点：%d\n", player.Accum)
-			fmt.Printf("平均顺位：%.3f\n", player.AvgJuni())
-			fmt.Printf("一位率: %.2f%%\n", player.JuniRitsu(0)*100)
-			fmt.Printf("二位率: %.2f%%\n", player.JuniRitsu(1)*100)
-			fmt.Printf("三位率: %.2f%%\n", player.JuniRitsu(2)*100)
-			fmt.Printf("四位率: %.2f%%\n", player.JuniRitsu(3)*100)
-			fmt.Printf("被飞次数：%d\n\n", player.Hakoshita)
-		}
+		printPlayerStats(playerStats)
 		exe, err := os.Executable()
 		if err != nil {
 			log.Fatal(err)
@@ -88,8 +128,5 @@ func main() {
 		data := htmlTemplateData{paipu, playerStats, me, MAJSOUL_PAIPU_URL}
 		renderHTML(data, htmlpath)
 		openbrowser("file://" + htmlpath)
-	} else {
-		fmt.Println("Usage: paiputongji path/to/HARfile")
-		os.Exit(0)
 	}
 }

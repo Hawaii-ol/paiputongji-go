@@ -12,6 +12,7 @@ const (
 	PROTO_FILENAME      = "liqi.proto"
 	META_FILENAME       = "liqi.pb.go"
 	DESCRIPTOR_FILENAME = "liqi.pb"
+	RPCMAP_FILENAME     = "liqi.rpc.go"
 )
 
 var exe, _ = os.Executable()
@@ -19,6 +20,7 @@ var RootDir = filepath.Join(filepath.Dir(exe), "..") // program runs in build/
 var JsonPath = filepath.Join(RootDir, "liqi", JSON_FILENAME)
 var ProtoPath = filepath.Join(RootDir, "liqi", PROTO_FILENAME)
 var DescriptorPath = filepath.Join(RootDir, "liqi", DESCRIPTOR_FILENAME)
+var RPCMapPath = filepath.Join(RootDir, "liqi", RPCMAP_FILENAME)
 
 func CompilerExecutable() (compiler string, err error) {
 	// Determine the protoc compiler

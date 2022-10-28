@@ -1,9 +1,7 @@
-package paiputongji
+package gen
 
 import (
 	"os"
-	"paiputongji/gen"
-	"path/filepath"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -15,14 +13,8 @@ import (
 // protoc生成的Go代码不包含Service部分，需要另外设法加载
 // 这个函数从protoc -o选项生成的pb文件中加载全部的Descriptor
 // 需要运行前置任务make genmeta生成pb文件
-func RegistryDescriptor() (protoreflect.FileDescriptor, error) {
-	// program runs as a standalone executable, with `liqi.pb` at the same directory
-	exe, err := os.Executable()
-	if err != nil {
-		return nil, err
-	}
-	pbPath := filepath.Join(filepath.Dir(exe), gen.DESCRIPTOR_FILENAME)
-	pbData, err := os.ReadFile(pbPath)
+func RegisterDescriptor(pbFilePath string) (protoreflect.FileDescriptor, error) {
+	pbData, err := os.ReadFile(pbFilePath)
 	if err != nil {
 		return nil, err
 	}

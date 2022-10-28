@@ -1,5 +1,6 @@
 .vscode/
 build/
+access_token
 liqi.proto
 liqi.pb
 index.html
