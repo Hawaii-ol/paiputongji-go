@@ -130,7 +130,7 @@ func wrapMessage(msgType int, msgId int, rpcname string, message proto.Message) 
 		binary.LittleEndian.PutUint16(b[1:], uint16(msgId))
 		copy(b[3:], data)
 	default:
-		return nil, errors.New(fmt.Sprintf("unknown message type 0x%x", msgId))
+		return nil, errors.New(fmt.Sprintf("unknown message type 0x%x", msgType))
 	}
 	return b, nil
 }
@@ -264,4 +264,5 @@ func (cli *MajsoulWSClient) Close() {
 		delete(cli.reqChanMap, id)
 	}
 	cli.reqChanMap = nil
+	cli.conn = nil
 }

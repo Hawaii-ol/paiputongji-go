@@ -52,8 +52,10 @@ func translateErrorCode(err *liqi.Error) string {
 	switch err.Code {
 	case 0:
 		errmsg = ""
+	case 1002:
+		errmsg = "账号不存在，请先注册(1002)"
 	case 1003:
-		errmsg = "用户名或密码错误"
+		errmsg = "密码错误(1003)"
 	default:
 		errmsg = fmt.Sprintf("未知错误(%d)，服务器返回信息：%s",
 			err.Code, strings.Join(err.StrParams, " "))
