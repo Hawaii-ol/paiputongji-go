@@ -9,10 +9,12 @@ import (
 	"paiputongji/client"
 	"paiputongji/liqi"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 )
 
 var localToken string
@@ -31,8 +33,8 @@ func printPlayerStats(stats []PlayerStats) {
 	}
 }
 
-func iconQuestionAsSelect(icons *survey.IconSet) {
-	icons.Question = icons.SelectFocus
+func iconInput(icons *survey.IconSet) {
+	icons.Question = survey.Icon{Text: ">", Format: "green+hb"}
 }
 
 func promptLogin(cli *client.MajsoulWSClient, version string) *liqi.ResLogin {
@@ -41,11 +43,17 @@ func promptLogin(cli *client.MajsoulWSClient, version string) *liqi.ResLogin {
 	prompt = &survey.Input{
 		Message: "请输入账号(邮箱)：",
 	}
-	survey.AskOne(prompt, &username, survey.WithIcons(iconQuestionAsSelect))
+	err := survey.AskOne(prompt, &username, survey.WithIcons(iconInput))
+	if err == terminal.InterruptErr {
+		os.Exit(0)
+	}
 	prompt = &survey.Password{
 		Message: "请输入密码：",
 	}
-	survey.AskOne(prompt, &password, survey.WithIcons(iconQuestionAsSelect))
+	err = survey.AskOne(prompt, &password, survey.WithIcons(iconInput))
+	if err == terminal.InterruptErr {
+		os.Exit(0)
+	}
 	fmt.Print("\n登录中...")
 	resLogin, err := cli.Api.Login(username, password, version)
 	if err != nil {
@@ -62,7 +70,10 @@ func promptConfirm(message string) bool {
 	prompt := &survey.Confirm{
 		Message: message,
 	}
-	survey.AskOne(prompt, &confirm)
+	err := survey.AskOne(prompt, &confirm)
+	if err == terminal.InterruptErr {
+		os.Exit(0)
+	}
 	return confirm
 }
 
@@ -76,7 +87,10 @@ func promptActionOption() int {
 			"[3]. 退出程序",
 		},
 	}
-	survey.AskOne(prompt, &option)
+	err := survey.AskOne(prompt, &option)
+	if err == terminal.InterruptErr {
+		os.Exit(0)
+	}
 	return option + 1
 }
 
@@ -87,7 +101,7 @@ func promptPaipuByDate() time.Time {
 		Message: "请输入查询起始日期：",
 		Help:    "日期格式为yyyy-mm-dd，例如：2006-01-02。将查询该日期至今的所有牌谱",
 	}
-	survey.AskOne(prompt, &input, survey.WithIcons(iconQuestionAsSelect), survey.WithValidator(
+	err := survey.AskOne(prompt, &input, survey.WithIcons(iconInput), survey.WithValidator(
 		func(val interface{}) error {
 			pattern := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 			s := val.(string)
@@ -98,8 +112,10 @@ func promptPaipuByDate() time.Time {
 				}
 			}
 			return errors.New("无效日期格式(输入?可查看帮助)")
-		}),
-	)
+		}))
+	if err == terminal.InterruptErr {
+		os.Exit(0)
+	}
 	return date
 }
 
@@ -108,7 +124,17 @@ func promptPaipuByCount() int {
 	prompt := &survey.Input{
 		Message: "请输入要查询的牌谱数量上限：",
 	}
-	survey.AskOne(prompt, &most, survey.WithIcons(iconQuestionAsSelect))
+	err := survey.AskOne(prompt, &most, survey.WithIcons(iconInput), survey.WithValidator(
+		func(val interface{}) error {
+			s := val.(string)
+			if i, err := strconv.Atoi(s); err != nil || i <= 0 {
+				return errors.New("必须输入一个正数。")
+			}
+			return nil
+		}))
+	if err == terminal.InterruptErr {
+		os.Exit(0)
+	}
 	return most
 }
 
