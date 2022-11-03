@@ -209,9 +209,10 @@ func (cli *MajsoulWSClient) SelectMessage() {
 			continue
 		}
 		if msgType == MSG_NOTIFICATION {
-			log.Println("接收到服务器通知：")
+			fmt.Println("接收到服务器通知：")
 			if notification, err := handleNotification(payload); err != nil {
-				log.Printf("解析通知内容失败：%s\n", err)
+				fmt.Println("解析通知内容失败:", err)
+				log.Println("failed to parse notification:", err)
 			} else {
 				fmt.Println(notification)
 			}

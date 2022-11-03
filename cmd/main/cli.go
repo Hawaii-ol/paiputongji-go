@@ -17,8 +17,6 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 )
 
-var localToken string
-
 func printPlayerStats(stats []PlayerStats) {
 	for _, player := range stats {
 		fmt.Printf("玩家：%s\n", player.Name)
@@ -58,7 +56,8 @@ func promptLogin(cli *client.MajsoulWSClient, version string) *liqi.ResLogin {
 	resLogin, err := cli.Api.Login(username, password, version)
 	if err != nil {
 		fmt.Println("失败！")
-		log.Fatal(err)
+		fmt.Println(err)
+		log.Fatalln("login failed:", err)
 	}
 	fmt.Println("成功")
 	fmt.Println(strings.Repeat("=", 60))
@@ -146,6 +145,10 @@ func fetchPaipuAfter(cli *client.MajsoulWSClient, date time.Time) ([]*Paipu, err
 		if err != nil {
 			return paipuSlice, err
 		}
+		if len(response.RecordList) == 0 {
+			log.Printf("empty record list(start: %d, count: %d)\n", start, count)
+			return paipuSlice, nil
+		}
 		for _, rec := range response.RecordList {
 			tm := time.Unix(int64(rec.EndTime), 0)
 			if tm.Before(date) {
@@ -153,29 +156,34 @@ func fetchPaipuAfter(cli *client.MajsoulWSClient, date time.Time) ([]*Paipu, err
 			}
 			if paipu := RecordGameToPaipu(rec, cli.Account); paipu != nil {
 				paipuSlice = append(paipuSlice, paipu)
-				start++
 			}
 		}
+		start += 10
 	}
 }
 
 func fetchPaipuAtMost(cli *client.MajsoulWSClient, most int) ([]*Paipu, error) {
-	start, count := 0, 10
+	start, count, valid := 0, 10, 0
 	paipuSlice := make([]*Paipu, 0, 10)
 	for {
 		response, err := cli.Api.FetchGameRecordList(start, count, client.GAMERECORDLIST_YOUREN)
 		if err != nil {
 			return paipuSlice, err
 		}
+		if len(response.RecordList) == 0 {
+			log.Printf("empty record list(start: %d, count: %d)\n", start, count)
+			return paipuSlice, nil
+		}
 		for _, rec := range response.RecordList {
 			if paipu := RecordGameToPaipu(rec, cli.Account); paipu != nil {
 				paipuSlice = append(paipuSlice, paipu)
-				start++
-				if start == most {
+				valid++
+				if valid == most {
 					return paipuSlice, nil
 				}
 			}
 		}
+		start += 10
 	}
 }
 
@@ -184,7 +192,7 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	cli := client.NewMajsoulClient()
 	if err := cli.Connect(); err != nil {
 		fmt.Println("失败！")
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
 	// 启动监听和心跳包协程
@@ -194,11 +202,13 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	fmt.Println("\n获取版本信息...")
 	gameVer, err := client.GetGameVersion()
 	if err != nil {
-		log.Fatalf("获取游戏版本号失败: %s", err)
+		fmt.Println("获取游戏版本号失败:", err)
+		log.Fatalln(err)
 	}
 	liqiVer, err := client.GetGameResVersion(gameVer, client.MAJSOUL_LIQIJSON_RESPATH)
 	if err != nil {
-		log.Fatalf("获取liqi.json版本号失败: %s", err)
+		fmt.Println("获取liqi.json版本号失败:", err)
+		log.Fatalln(err)
 	}
 	fmt.Printf("当前的游戏版本号为%s，liqi.json的版本号为%s。\n", gameVer, liqiVer)
 	if PROGRAM_LIQIJSON_VERSION != liqiVer {
@@ -210,15 +220,16 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	localToken, err := loadAccessToken()
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			log.Printf("加载本地用户凭据失败：%s\n", err)
-			fmt.Println("请重新登录。")
+			fmt.Println("加载本地用户凭据失败，请重新登录。")
+			log.Println(err)
 		}
 		resLogin = promptLogin(cli, gameVer)
 	} else {
 		fmt.Print("检测到本地用户凭据，登录中...")
 		valid, err := cli.Api.Oauth2Check(localToken)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println("失败！")
+			log.Fatalln("oauth2Check failed:", err)
 		}
 		if !valid {
 			fmt.Println("失败！\n用户凭据已过期，请重新登录。")
@@ -227,7 +238,7 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 			resLogin, err = cli.Api.Oauth2Login(localToken, gameVer)
 			if err != nil {
 				fmt.Println("失败！")
-				log.Fatal(err)
+				log.Fatalln("oauth2Login failed:", err)
 			}
 			fmt.Println("成功")
 		}
@@ -238,13 +249,15 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	fmt.Printf("创建时间：\t%s\n", signUpTime.Format("2006-01-02 15:04:05"))
 	loginTIme := time.Unix(int64(resLogin.Account.LoginTime), 0)
 	fmt.Printf("登录时间：\t%s\n", loginTIme.Format("2006-01-02 15:04:05"))
+	log.Printf("logged in as user %s(uid=%d)\n", resLogin.Account.Nickname, resLogin.AccountId)
 	if localToken != resLogin.AccessToken {
 		if promptConfirm("是否保存用户凭据到本地，以便下次自动登录？") {
 			if err = saveAccessToken(resLogin.AccessToken); err == nil {
 				localToken = resLogin.AccessToken
 				fmt.Println("已保存用户凭据。")
 			} else {
-				log.Fatal("保存用户凭据失败：", err)
+				fmt.Println("保存用户凭据失败:", err)
+				log.Println(err)
 			}
 		}
 	}
@@ -257,7 +270,7 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 		fmt.Println("查询中请稍候...")
 		paipu, err := fetchPaipuAfter(cli, date)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalln(err)
 		}
 		return paipu, cli.Account
 	case 2:
@@ -265,13 +278,14 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 		fmt.Println("查询中请稍候...")
 		paipu, err := fetchPaipuAtMost(cli, most)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalln(err)
 		}
 		return paipu, cli.Account
 	case 3:
 		if localToken != "" && promptConfirm("是否删除本地保存的用户凭据？") {
 			if err = deleteAccessToken(); err != nil {
-				log.Fatal(err)
+				fmt.Println("删除用户凭据失败:", err)
+				log.Fatalln(err)
 			}
 		}
 		os.Exit(0)
@@ -454,11 +468,11 @@ func simulateActualClient(cli *client.MajsoulWSClient) {
 
 	// And finally, a loginSuccess message to the server
 	if err := cli.Api.LoginSuccess(); err != nil {
-		log.Fatalf(`send "loginSuccess" message failed: %s`, err)
+		log.Println(`send "loginSuccess" message failed:`, err)
 	}
 
 	_, err := cli.Api.FetchCollectedGameRecordList()
 	if err != nil {
-		log.Fatalf(`fetchCollectedGameRecordList failed: %s`, err)
+		log.Println(`fetchCollectedGameRecordList failed:`, err)
 	}
 }
