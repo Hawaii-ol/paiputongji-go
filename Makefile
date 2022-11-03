@@ -1,5 +1,6 @@
 BLDPATH=build
 CMDPATH=cmd
+CC=gcc
 ifeq ($(OS), Windows_NT)
 	EXEEXT=.exe
 else
@@ -10,6 +11,9 @@ all: goinstall genmeta main update
 
 main:
 	go build -o $(BLDPATH)/paiputongji$(EXEEXT) ./$(CMDPATH)/$@/
+ifeq ($(OS), Windows_NT)
+	@cp $(CMDPATH)/$@/launcher.bat $(BLDPATH)/
+endif
 	@echo Copying resource files into $(BLDPATH)/...
 	@cp -r res $(BLDPATH)/
 
