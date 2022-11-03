@@ -156,14 +156,18 @@ func fetchPaipuAfter(cli *client.MajsoulWSClient, date time.Time) ([]*Paipu, err
 			}
 			if paipu := RecordGameToPaipu(rec, cli.Account); paipu != nil {
 				paipuSlice = append(paipuSlice, paipu)
+				if len(paipuSlice)%50 == 0 {
+					fmt.Printf("已查询%d条记录...\n", len(paipuSlice))
+				}
 			}
 		}
 		start += 10
+		time.Sleep(300 * time.Millisecond) // 限速300ms/次
 	}
 }
 
 func fetchPaipuAtMost(cli *client.MajsoulWSClient, most int) ([]*Paipu, error) {
-	start, count, valid := 0, 10, 0
+	start, count := 0, 10
 	paipuSlice := make([]*Paipu, 0, 10)
 	for {
 		response, err := cli.Api.FetchGameRecordList(start, count, client.GAMERECORDLIST_YOUREN)
@@ -177,13 +181,16 @@ func fetchPaipuAtMost(cli *client.MajsoulWSClient, most int) ([]*Paipu, error) {
 		for _, rec := range response.RecordList {
 			if paipu := RecordGameToPaipu(rec, cli.Account); paipu != nil {
 				paipuSlice = append(paipuSlice, paipu)
-				valid++
-				if valid == most {
+				if len(paipuSlice)%50 == 0 {
+					fmt.Printf("已查询%d条记录...\n", len(paipuSlice))
+				}
+				if len(paipuSlice) == most {
 					return paipuSlice, nil
 				}
 			}
 		}
 		start += 10
+		time.Sleep(300 * time.Millisecond) // 限速300ms/次
 	}
 }
 
@@ -268,6 +275,7 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	case 1:
 		date := promptPaipuByDate()
 		fmt.Println("查询中请稍候...")
+		fmt.Println("为避免请求频率过快，将限制查询速度，请耐心等待")
 		paipu, err := fetchPaipuAfter(cli, date)
 		if err != nil {
 			log.Fatalln(err)
@@ -276,6 +284,7 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	case 2:
 		most := promptPaipuByCount()
 		fmt.Println("查询中请稍候...")
+		fmt.Println("为避免请求频率过快，将限制查询速度，请耐心等待")
 		paipu, err := fetchPaipuAtMost(cli, most)
 		if err != nil {
 			log.Fatalln(err)
