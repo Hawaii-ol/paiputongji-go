@@ -52,6 +52,8 @@ func translateErrorCode(err *liqi.Error) string {
 	switch err.Code {
 	case 0:
 		errmsg = ""
+	case 109:
+		errmsg = "授权出错，登入已过期，请重新登入(109)"
 	case 1002:
 		errmsg = "账号不存在，请先注册(1002)"
 	case 1003:
@@ -85,7 +87,7 @@ func (api *ApiDelegate) apiGeneral(rpcname string, request proto.Message, respon
 	return nil
 }
 
-// 发送心跳包到服务器
+// HeatBeat 发送心跳包到服务器
 func (api *ApiDelegate) HeatBeat() error {
 	request := new(liqi.ReqHeatBeat)
 	callback := make(chan []byte, 1)
@@ -96,7 +98,7 @@ func (api *ApiDelegate) HeatBeat() error {
 	return nil
 }
 
-// 账号密码登录，登陆后账号信息将记录在client中，返回*liqi.ResLogin
+// Login 账号密码登录，登陆后账号信息将记录在client中，返回*liqi.ResLogin
 func (api *ApiDelegate) Login(account, password, version string) (*liqi.ResLogin, error) {
 	cvs := version
 	if strings.HasSuffix(cvs, ".w") {
@@ -114,24 +116,17 @@ func (api *ApiDelegate) Login(account, password, version string) (*liqi.ResLogin
 		CurrencyPlatforms:   []uint32{2, 6, 8, 10, 11},
 		ClientVersionString: "web-" + cvs,
 	}
-	callback := make(chan []byte, 1)
-	if err := api.cli.SendMessage("login", request, callback); err != nil {
-		return nil, err
-	}
-	data := <-callback
 	response := new(liqi.ResLogin)
-	if err := proto.Unmarshal(data, response); err != nil {
+	err := api.apiGeneral("login", request, response)
+	if err != nil {
 		return nil, err
-	}
-	if response.Error != nil {
-		return response, errors.New(translateErrorCode(response.Error))
 	}
 	api.login = true
 	api.cli.Account = response.Account
 	return response, nil
 }
 
-// 校验token状态
+// Oauth2Check 校验token状态
 func (api *ApiDelegate) Oauth2Check(token string) (bool, error) {
 	request := &liqi.ReqOauth2Check{AccessToken: token}
 	response := new(liqi.ResOauth2Check)
@@ -142,7 +137,7 @@ func (api *ApiDelegate) Oauth2Check(token string) (bool, error) {
 	return response.HasAccount, nil
 }
 
-// oauth2登录，返回*liqi.ResLogin
+// Oauth2Login oauth2登录，返回*liqi.ResLogin
 func (api *ApiDelegate) Oauth2Login(token string, version string) (*liqi.ResLogin, error) {
 	cvs := version
 	if strings.HasSuffix(cvs, ".w") {
@@ -160,23 +155,16 @@ func (api *ApiDelegate) Oauth2Login(token string, version string) (*liqi.ResLogi
 		CurrencyPlatforms:   []uint32{2, 6, 8, 10, 11},
 		ClientVersionString: "web-" + cvs,
 	}
-	callback := make(chan []byte, 1)
-	if err := api.cli.SendMessage("oauth2Login", request, callback); err != nil {
-		return nil, err
-	}
-	data := <-callback
 	response := new(liqi.ResLogin)
-	if err := proto.Unmarshal(data, response); err != nil {
+	if err := api.apiGeneral("oauth2Login", request, response); err != nil {
 		return nil, err
-	} else if response.Error != nil {
-		return response, errors.New(translateErrorCode(response.Error))
 	}
 	api.login = true
 	api.cli.Account = response.Account
 	return response, nil
 }
 
-// 拉取收藏牌谱列表
+// FetchCollectedGameRecordList 拉取收藏牌谱列表
 func (api *ApiDelegate) FetchCollectedGameRecordList() (*liqi.ResCollectedGameRecordList, error) {
 	request := new(liqi.ReqCommon)
 	response := new(liqi.ResCollectedGameRecordList)
@@ -184,7 +172,7 @@ func (api *ApiDelegate) FetchCollectedGameRecordList() (*liqi.ResCollectedGameRe
 	return response, err
 }
 
-// 拉取牌谱列表，返回*liqi.ResGameRecordList
+// FetchGameRecordList 拉取牌谱列表，返回*liqi.ResGameRecordList
 func (api *ApiDelegate) FetchGameRecordList(start, count, recordType int) (*liqi.ResGameRecordList, error) {
 	request := &liqi.ReqGameRecordList{
 		Start: uint32(start),

@@ -234,12 +234,14 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	} else {
 		fmt.Print("检测到本地用户凭据，登录中...")
 		valid, err := cli.Api.Oauth2Check(localToken)
-		if err != nil {
-			fmt.Println("失败！")
-			log.Fatalln("oauth2Check failed:", err)
-		}
 		if !valid {
-			fmt.Println("失败！\n用户凭据已过期，请重新登录。")
+			fmt.Println("失败！")
+			fmt.Println(err)
+			log.Println("oauth2Check failed:", err)
+			if err = deleteAccessToken(); err != nil {
+				fmt.Println("删除用户凭据失败:", err)
+				log.Println(err)
+			}
 			resLogin = promptLogin(cli, gameVer)
 		} else {
 			resLogin, err = cli.Api.Oauth2Login(localToken, gameVer)

@@ -244,7 +244,7 @@ func handleNotification(data []byte) (proto.Message, error) {
 	return message, err
 }
 
-// 模拟心跳包，间隔为秒
+// StartHeartBeat 模拟心跳包，间隔为秒
 func (cli *MajsoulWSClient) StartHeartBeat(intervalSec int) {
 	for {
 		cli.Api.HeatBeat()
