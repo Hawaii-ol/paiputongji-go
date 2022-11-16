@@ -12,8 +12,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 const (
@@ -154,7 +152,7 @@ func unwrapMessage(data []byte) (msgType int, msgId int, payload []byte, err err
 	return
 }
 
-// 发送一条消息，callback为接收响应的回调channel
+// SendMessage 发送一条消息，callback为接收响应的回调channel
 //
 // goroutine-safe
 func (cli *MajsoulWSClient) SendMessage(rpcname string, message proto.Message, callback chan []byte) (err error) {
@@ -177,7 +175,7 @@ func (cli *MajsoulWSClient) SendMessage(rpcname string, message proto.Message, c
 	reqId := cli.registerRequest(message, callback)
 	defer func() {
 		if err != nil {
-			// make sure we checkout the registered id
+			// make sure we check out the registered id
 			cli.checkoutRequest(reqId)
 		}
 	}()
@@ -190,13 +188,13 @@ func (cli *MajsoulWSClient) SendMessage(rpcname string, message proto.Message, c
 	return cli.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
-// 循环读取消息，并将响应发回对应的回调channel。
+// SelectMessage 循环读取消息，并将响应发回对应的回调channel。
 // 如果发生连接或读取错误将panic。其他错误例如数据错误将忽略并打印日志。
 //
 // goroutine-safe
 func (cli *MajsoulWSClient) SelectMessage() {
 	if cli.conn == nil {
-		panic(errors.New("not conneted yet, use Connect() first."))
+		panic(errors.New("not connected yet, use Connect() first"))
 	}
 	for {
 		_, data, err := cli.conn.ReadMessage()
@@ -209,12 +207,11 @@ func (cli *MajsoulWSClient) SelectMessage() {
 			continue
 		}
 		if msgType == MSG_NOTIFICATION {
-			fmt.Println("接收到服务器通知：")
-			if notification, err := handleNotification(payload); err != nil {
+			fmt.Print("接收到服务器通知: ")
+			if err := HandleNotification(payload); err != nil {
 				fmt.Println("解析通知内容失败:", err)
-				log.Println("failed to parse notification:", err)
-			} else {
-				fmt.Println(notification)
+				log.Println("failed to handle notification:", err)
+				log.Println("notification payload:", payload)
 			}
 		} else {
 			_, callback, err := cli.checkoutRequest(msgId)
@@ -225,23 +222,6 @@ func (cli *MajsoulWSClient) SelectMessage() {
 			callback <- payload
 		}
 	}
-}
-
-func handleNotification(data []byte) (proto.Message, error) {
-	wrapper := new(liqi.Wrapper)
-	if err := proto.Unmarshal(data, wrapper); err != nil {
-		return nil, err
-	}
-	// 通知没有方法名，name就是消息名，例如.lq.NotifyAccountUpdate
-	// remove the leading dot
-	name := protoreflect.FullName(wrapper.Name[1:])
-	msgType, err := protoregistry.GlobalTypes.FindMessageByName(name)
-	if err != nil {
-		return nil, err
-	}
-	message := msgType.New().Interface()
-	err = proto.Unmarshal(data, message)
-	return message, err
 }
 
 // StartHeartBeat 模拟心跳包，间隔为秒

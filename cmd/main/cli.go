@@ -219,8 +219,12 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	}
 	fmt.Printf("当前的游戏版本号为%s，liqi.json的版本号为%s。\n", gameVer, liqiVer)
 	if PROGRAM_LIQIJSON_VERSION != liqiVer {
-		fmt.Printf("!!! 程序使用的liqi.json版本号为%s，而最新的版本号为%s。版本不一致可能导致程序出现问题，请及时更新。",
+		fmt.Printf("!!! 程序使用的liqi.json版本号为%s，而最新的版本号为%s。版本不一致可能导致程序出现问题，请及时更新。\n",
 			PROGRAM_LIQIJSON_VERSION, liqiVer)
+		log.Printf("VERSION MISMATCH: liqi.json: local: %s, remote: %s\n", PROGRAM_LIQIJSON_VERSION, liqiVer)
+		if !promptConfirm("你确定要继续使用吗？") {
+			os.Exit(0)
+		}
 	}
 	fmt.Println(strings.Repeat("=", 60))
 	var resLogin *liqi.ResLogin

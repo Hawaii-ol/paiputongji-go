@@ -52,6 +52,8 @@ func translateErrorCode(err *liqi.Error) string {
 	switch err.Code {
 	case 0:
 		errmsg = ""
+	case 103:
+		errmsg = "维护中，服务器暂未开放(103)"
 	case 109:
 		errmsg = "授权出错，登入已过期，请重新登入(109)"
 	case 1002:
