@@ -5,6 +5,7 @@ ifeq ($(OS), Windows_NT)
 	EXEEXT=.exe
 else
 	EXEEXT=
+export PATH:=$(PATH):$(shell go env GOPATH)/bin
 endif
 
 all: goinstall genmeta main update
