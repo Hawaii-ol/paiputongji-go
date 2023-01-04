@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	MAJSOUL_URLBASE          = "https://game.maj-soul.net/1/"
-	MAJSOUL_GATEWAY          = "wss://gateway-hw.maj-soul.net/gateway"
+	MAJSOUL_URLBASE          = "https://game.maj-soul.com/1/"
+	MAJSOUL_GATEWAY          = "wss://gateway-hw.maj-soul.com/gateway"
 	MAJSOUL_VER_URLFMT       = MAJSOUL_URLBASE + "version.json?randv=%d"
 	MAJSOUL_RESVER_URLFMT    = MAJSOUL_URLBASE + "resversion%s.json"
 	MAJSOUL_LIQIJSON_RESPATH = "res/proto/liqi.json"
