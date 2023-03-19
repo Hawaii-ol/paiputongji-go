@@ -210,20 +210,34 @@ func InteractiveMode() ([]*Paipu, *liqi.Account) {
 	gameVer, err := client.GetGameVersion()
 	if err != nil {
 		fmt.Println("获取游戏版本号失败:", err)
-		log.Fatalln(err)
+		if err == client.DDoSError {
+			if !promptConfirm("似乎遇到了浏览器安全检测，要跳过版本号信息吗？") {
+				log.Fatalln(err)
+			}
+		} else {
+			log.Fatalln(err)
+		}
 	}
 	liqiVer, err := client.GetGameResVersion(gameVer, client.MAJSOUL_LIQIJSON_RESPATH)
 	if err != nil {
 		fmt.Println("获取liqi.json版本号失败:", err)
-		log.Fatalln(err)
+		if err == client.DDoSError {
+			if !promptConfirm("似乎遇到了浏览器安全检测，要跳过版本号信息吗？") {
+				log.Fatalln(err)
+			}
+		} else {
+			log.Fatalln(err)
+		}
 	}
-	fmt.Printf("当前的游戏版本号为%s，liqi.json的版本号为%s。\n", gameVer, liqiVer)
-	if PROGRAM_LIQIJSON_VERSION != liqiVer {
-		fmt.Printf("!!! 程序使用的liqi.json版本号为%s，而最新的版本号为%s。版本不一致可能导致程序出现问题，请及时更新。\n",
-			PROGRAM_LIQIJSON_VERSION, liqiVer)
-		log.Printf("VERSION MISMATCH: liqi.json: local: %s, remote: %s\n", PROGRAM_LIQIJSON_VERSION, liqiVer)
-		if !promptConfirm("你确定要继续使用吗？") {
-			os.Exit(0)
+	if gameVer != "" && liqiVer != "" {
+		fmt.Printf("当前的游戏版本号为%s，liqi.json的版本号为%s。\n", gameVer, liqiVer)
+		if PROGRAM_LIQIJSON_VERSION != liqiVer {
+			fmt.Printf("!!! 程序使用的liqi.json版本号为%s，而最新的版本号为%s。版本不一致可能导致程序出现问题，请及时更新。\n",
+				PROGRAM_LIQIJSON_VERSION, liqiVer)
+			log.Printf("VERSION MISMATCH: liqi.json: local: %s, remote: %s\n", PROGRAM_LIQIJSON_VERSION, liqiVer)
+			if !promptConfirm("你确定要继续使用吗？") {
+				os.Exit(0)
+			}
 		}
 	}
 	fmt.Println(strings.Repeat("=", 60))

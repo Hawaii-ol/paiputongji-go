@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -19,6 +20,8 @@ const (
 	MAJSOUL_LIQIJSON_RESPATH = "res/proto/liqi.json"
 	USER_AGENT               = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36"
 )
+
+var DDoSError error = errors.New("DDoS Protection")
 
 type resVersion struct {
 	Res map[string]struct {
@@ -51,9 +54,19 @@ func randv() int64 {
 	return rand.Int63n(9e18) + 1e18
 }
 
+func checkDDoSProtection(htmlData []byte) error {
+	htmlText := string(htmlData)
+	if strings.Contains(htmlText, "浏览器安全检查") {
+		return DDoSError
+	}
+	return nil
+}
+
 func GetGameVersion() (string, error) {
 	url := fmt.Sprintf(MAJSOUL_VER_URLFMT, randv())
 	data, err := HttpGet(url)
+	// 检查是否有DDos检测
+	err = checkDDoSProtection(data)
 	if err != nil {
 		return "", err
 	}
@@ -67,6 +80,8 @@ func GetGameVersion() (string, error) {
 func GetGameResVersion(gameVersion string, resPath string) (string, error) {
 	url := fmt.Sprintf(MAJSOUL_RESVER_URLFMT, gameVersion)
 	data, err := HttpGet(url)
+	// 检查是否有DDos检测
+	err = checkDDoSProtection(data)
 	if err != nil {
 		return "", err
 	}

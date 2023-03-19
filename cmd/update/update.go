@@ -30,7 +30,7 @@ func main() {
 	}
 	fmt.Printf("The latest liqi.json version is %s\n", liqiVer)
 	fmt.Println("Downloading liqi.json...")
-	data, err := HttpGet(fmt.Sprintf("%s/%s/%s", MAJSOUL_URLBASE, liqiVer, MAJSOUL_LIQIJSON_RESPATH))
+	data, err := HttpGet(fmt.Sprintf("%s%s/%s", MAJSOUL_URLBASE, liqiVer, MAJSOUL_LIQIJSON_RESPATH))
 	if err != nil {
 		log.Fatal(err)
 	}
