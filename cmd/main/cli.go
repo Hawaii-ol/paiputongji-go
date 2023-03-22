@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -83,7 +84,8 @@ func promptActionOption() int {
 		Options: []string{
 			"[1]. 按日期查询牌谱",
 			"[2]. 按数量查询牌谱",
-			"[3]. 退出程序",
+			"[3]. 切换用户",
+			"[4]. 退出程序",
 		},
 	}
 	err := survey.AskOne(prompt, &option)
@@ -195,313 +197,313 @@ func fetchPaipuAtMost(cli *client.MajsoulWSClient, most int) ([]*Paipu, error) {
 }
 
 func InteractiveMode() ([]*Paipu, *liqi.Account) {
-	fmt.Print("连接到雀魂服务器...")
+	var gameVer, liqiVer string
+	var err error
 	cli := client.NewMajsoulClient()
-	if err := cli.Connect(); err != nil {
-		fmt.Println("失败！")
-		log.Fatalln(err)
-	}
-
-	// 启动监听和心跳包协程
-	go cli.SelectMessage()
-	go cli.StartHeartBeat(5)
-
-	fmt.Println("\n获取版本信息...")
-	gameVer, err := client.GetGameVersion()
-	if err != nil {
-		fmt.Println("获取游戏版本号失败:", err)
-		if err == client.DDoSError {
-			if !promptConfirm("似乎遇到了浏览器安全检测，要跳过版本号信息吗？") {
-				log.Fatalln(err)
-			}
-		} else {
-			log.Fatalln(err)
-		}
-	}
-	liqiVer, err := client.GetGameResVersion(gameVer, client.MAJSOUL_LIQIJSON_RESPATH)
-	if err != nil {
-		fmt.Println("获取liqi.json版本号失败:", err)
-		if err == client.DDoSError {
-			if !promptConfirm("似乎遇到了浏览器安全检测，要跳过版本号信息吗？") {
-				log.Fatalln(err)
-			}
-		} else {
-			log.Fatalln(err)
-		}
-	}
-	if gameVer != "" && liqiVer != "" {
-		fmt.Printf("当前的游戏版本号为%s，liqi.json的版本号为%s。\n", gameVer, liqiVer)
-		if PROGRAM_LIQIJSON_VERSION != liqiVer {
-			fmt.Printf("!!! 程序使用的liqi.json版本号为%s，而最新的版本号为%s。版本不一致可能导致程序出现问题，请及时更新。\n",
-				PROGRAM_LIQIJSON_VERSION, liqiVer)
-			log.Printf("VERSION MISMATCH: liqi.json: local: %s, remote: %s\n", PROGRAM_LIQIJSON_VERSION, liqiVer)
-			if !promptConfirm("你确定要继续使用吗？") {
-				os.Exit(0)
-			}
-		}
-	}
-	fmt.Println(strings.Repeat("=", 60))
-	var resLogin *liqi.ResLogin
-	localToken, err := loadAccessToken()
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			fmt.Println("加载本地用户凭据失败，请重新登录。")
-			log.Println(err)
-		}
-		resLogin = promptLogin(cli, gameVer)
-	} else {
-		fmt.Print("检测到本地用户凭据，登录中...")
-		valid, err := cli.Api.Oauth2Check(localToken)
-		if !valid {
+	for {
+		fmt.Print("连接到雀魂服务器...")
+		if err := cli.Connect(); err != nil {
 			fmt.Println("失败！")
-			fmt.Println(err)
-			log.Println("oauth2Check failed:", err)
-			if err = deleteAccessToken(); err != nil {
-				fmt.Println("删除用户凭据失败:", err)
+			log.Fatalln(err)
+		}
+
+		// 启动监听和心跳包协程
+		var wg sync.WaitGroup
+		wg.Add(2)
+		abortHeartBeat := make(chan struct{})
+		go cli.SelectMessage(&wg)
+		go cli.StartHeartBeat(5, abortHeartBeat, &wg)
+
+		fmt.Println("\n获取版本信息...")
+		gameVer, err = client.GetGameVersion()
+		if err != nil {
+			fmt.Println("获取游戏版本号失败:", err)
+			if err == client.DDoSError {
+				if !promptConfirm("似乎遇到了浏览器安全检测，要跳过版本号信息吗？") {
+					log.Fatalln(err)
+				}
+			} else {
+				log.Fatalln(err)
+			}
+		}
+		liqiVer, err = client.GetGameResVersion(gameVer, client.MAJSOUL_LIQIJSON_RESPATH)
+		if err != nil {
+			fmt.Println("获取liqi.json版本号失败:", err)
+			if err == client.DDoSError {
+				if !promptConfirm("似乎遇到了浏览器安全检测，要跳过版本号信息吗？") {
+					log.Fatalln(err)
+				}
+			} else {
+				log.Fatalln(err)
+			}
+		}
+		if gameVer != "" && liqiVer != "" {
+			fmt.Printf("当前的游戏版本号为%s，liqi.json的版本号为%s。\n", gameVer, liqiVer)
+			if PROGRAM_LIQIJSON_VERSION != liqiVer {
+				fmt.Printf("!!! 程序使用的liqi.json版本号为%s，而最新的版本号为%s。版本不一致可能导致程序出现问题，请及时更新。\n",
+					PROGRAM_LIQIJSON_VERSION, liqiVer)
+				log.Printf("VERSION MISMATCH: liqi.json: local: %s, remote: %s\n", PROGRAM_LIQIJSON_VERSION, liqiVer)
+				if !promptConfirm("你确定要继续使用吗？") {
+					os.Exit(0)
+				}
+			}
+		}
+		fmt.Println(strings.Repeat("=", 60))
+		var resLogin *liqi.ResLogin
+		localToken, err := loadAccessToken()
+		if err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				fmt.Println("加载本地用户凭据失败，请重新登录。")
 				log.Println(err)
 			}
 			resLogin = promptLogin(cli, gameVer)
 		} else {
-			resLogin, err = cli.Api.Oauth2Login(localToken, gameVer)
-			if err != nil {
+			fmt.Print("检测到本地用户凭据，登录中...")
+			valid, err := cli.Api.Oauth2Check(localToken)
+			if !valid {
 				fmt.Println("失败！")
-				log.Fatalln("oauth2Login failed:", err)
-			}
-			fmt.Println("成功")
-		}
-	}
-	fmt.Printf("uid：\t\t%d\n", resLogin.AccountId)
-	fmt.Printf("昵称：\t\t%s\n", resLogin.Account.Nickname)
-	signUpTime := time.Unix(int64(resLogin.SignupTime), 0)
-	fmt.Printf("创建时间：\t%s\n", signUpTime.Format("2006-01-02 15:04:05"))
-	loginTIme := time.Unix(int64(resLogin.Account.LoginTime), 0)
-	fmt.Printf("登录时间：\t%s\n", loginTIme.Format("2006-01-02 15:04:05"))
-	log.Printf("logged in as user %s(uid=%d)\n", resLogin.Account.Nickname, resLogin.AccountId)
-	if localToken != resLogin.AccessToken {
-		if promptConfirm("是否保存用户凭据到本地，以便下次自动登录？") {
-			if err = saveAccessToken(resLogin.AccessToken); err == nil {
-				localToken = resLogin.AccessToken
-				fmt.Println("已保存用户凭据。")
+				fmt.Println(err)
+				log.Println("oauth2Check failed:", err)
+				if err = deleteAccessToken(); err != nil {
+					fmt.Println("删除用户凭据失败:", err)
+					log.Println(err)
+				}
+				resLogin = promptLogin(cli, gameVer)
 			} else {
-				fmt.Println("保存用户凭据失败:", err)
-				log.Println(err)
+				resLogin, err = cli.Api.Oauth2Login(localToken, gameVer)
+				if err != nil {
+					fmt.Println("失败！")
+					log.Fatalln("oauth2Login failed:", err)
+				}
+				fmt.Println("成功")
 			}
 		}
-	}
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Println("模拟正常客户端载入流程中，请稍候...")
-	simulateActualClient(cli)
-	switch promptActionOption() {
-	case 1:
-		date := promptPaipuByDate()
-		fmt.Println("查询中请稍候...")
-		fmt.Println("为避免请求频率过快，将限制查询速度，请耐心等待")
-		paipu, err := fetchPaipuAfter(cli, date)
-		if err != nil {
-			log.Fatalln(err)
+		fmt.Printf("uid：\t\t%d\n", resLogin.AccountId)
+		fmt.Printf("昵称：\t\t%s\n", resLogin.Account.Nickname)
+		signUpTime := time.Unix(int64(resLogin.SignupTime), 0)
+		fmt.Printf("创建时间：\t%s\n", signUpTime.Format("2006-01-02 15:04:05"))
+		loginTIme := time.Unix(int64(resLogin.Account.LoginTime), 0)
+		fmt.Printf("登录时间：\t%s\n", loginTIme.Format("2006-01-02 15:04:05"))
+		log.Printf("logged in as user %s(uid=%d)\n", resLogin.Account.Nickname, resLogin.AccountId)
+		if localToken != resLogin.AccessToken {
+			if promptConfirm("是否保存用户凭据到本地，以便下次自动登录？") {
+				if err = saveAccessToken(resLogin.AccessToken); err == nil {
+					localToken = resLogin.AccessToken
+					fmt.Println("已保存用户凭据。")
+				} else {
+					fmt.Println("保存用户凭据失败:", err)
+					log.Println(err)
+				}
+			}
 		}
-		return paipu, cli.Account
-	case 2:
-		most := promptPaipuByCount()
-		fmt.Println("查询中请稍候...")
-		fmt.Println("为避免请求频率过快，将限制查询速度，请耐心等待")
-		paipu, err := fetchPaipuAtMost(cli, most)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		return paipu, cli.Account
-	case 3:
-		if localToken != "" && promptConfirm("是否删除本地保存的用户凭据？") {
+		fmt.Println(strings.Repeat("=", 60))
+		fmt.Println("模拟正常客户端载入流程中，请稍候...")
+		simulateActualClient(cli)
+		switch promptActionOption() {
+		case 1:
+			date := promptPaipuByDate()
+			fmt.Println("查询中请稍候...")
+			fmt.Println("为避免请求频率过快，将限制查询速度，请耐心等待")
+			paipu, err := fetchPaipuAfter(cli, date)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			return paipu, cli.Account
+		case 2:
+			most := promptPaipuByCount()
+			fmt.Println("查询中请稍候...")
+			fmt.Println("为避免请求频率过快，将限制查询速度，请耐心等待")
+			paipu, err := fetchPaipuAtMost(cli, most)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			return paipu, cli.Account
+		case 3:
+			fmt.Println("关闭当前连接...")
+			abortHeartBeat <- struct{}{}
+			cli.Close()
+			wg.Wait()
 			if err = deleteAccessToken(); err != nil {
 				fmt.Println("删除用户凭据失败:", err)
 				log.Fatalln(err)
 			}
+			continue
+		case 4:
+			os.Exit(0)
 		}
-		os.Exit(0)
 	}
-	return nil, nil // this is necessary, although control flow will never reach here
 }
 
 // 模仿正常客户端的动作
 func simulateActualClient(cli *client.MajsoulWSClient) {
-	reqCount := 0
-	done := make(chan struct{}, 5)
+	var wg sync.WaitGroup
 
 	// fetchLastPrivacy
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchLastPrivacy(1, 2)
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchServerTime
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchServerTime()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchServerSettings
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchServerSettings()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchConnectionInfo
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchConnectionInfo()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchClientValue
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchClientValue()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchFriendList
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchFriendList()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchFriendApplyList
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchFriendApplyList()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchMailInfo
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchMailInfo()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchDailyTask
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchDailyTask()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchReviveCoinInfo
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchReviveCoinInfo()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchTitleList
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchTitleList()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchBagInfo
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchBagInfo()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchShopInfo
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchShopInfo()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchActivityList
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchActivityList()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchAccountActivityData
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchAccountActivityData()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchActivityBuff
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchActivityBuff()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchVipReward
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchVipReward()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchMonthTicketInfo
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchMonthTicketInfo()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchAchievement
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchAchievement()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchCommentSetting
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchCommentSetting()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchAccountSettings
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchAccountSettings()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchModNicknameTime
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchModNicknameTime()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchMisc
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchMisc()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchAnnouncement
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchAnnouncement()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchRollingNotice
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchRollingNotice()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchCharacterInfo
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchCharacterInfo()
-		done <- struct{}{}
+		wg.Done()
 	}()
 	// fetchAllCommonViews
-	reqCount++
+	wg.Add(1)
 	go func() {
 		cli.Api.FetchAllCommonViews()
-		done <- struct{}{}
+		wg.Done()
 	}()
 
-	for reqCount > 0 {
-		<-done
-		reqCount--
-	}
+	wg.Wait()
 
 	// And finally, a loginSuccess message to the server
-	if err := cli.Api.LoginSuccess(); err != nil {
-		log.Println(`send "loginSuccess" message failed:`, err)
-	}
-
-	_, err := cli.Api.FetchCollectedGameRecordList()
-	if err != nil {
-		log.Println(`fetchCollectedGameRecordList failed:`, err)
-	}
+	cli.Api.LoginSuccess()
+	cli.Api.FetchCollectedGameRecordList()
 }

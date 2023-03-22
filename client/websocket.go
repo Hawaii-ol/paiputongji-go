@@ -157,7 +157,7 @@ func unwrapMessage(data []byte) (msgType int, msgId int, payload []byte, err err
 // goroutine-safe
 func (cli *MajsoulWSClient) SendMessage(rpcname string, message proto.Message, callback chan []byte) (err error) {
 	if cli.conn == nil {
-		return errors.New("not conneted yet, use Connect() first.")
+		return errors.New("not connected yet, use Connect() first")
 	}
 	// check if message type matches rpc's request type
 	/*
@@ -192,14 +192,26 @@ func (cli *MajsoulWSClient) SendMessage(rpcname string, message proto.Message, c
 // 如果发生连接或读取错误将panic。其他错误例如数据错误将忽略并打印日志。
 //
 // goroutine-safe
-func (cli *MajsoulWSClient) SelectMessage() {
+func (cli *MajsoulWSClient) SelectMessage(wg *sync.WaitGroup) {
+	defer wg.Done()
 	if cli.conn == nil {
 		panic(errors.New("not connected yet, use Connect() first"))
 	}
 	for {
 		_, data, err := cli.conn.ReadMessage()
 		if err != nil {
-			panic(err)
+			cli.mu.Lock()
+			activeClose := false
+			// 切换用户等操作会主动关闭连接
+			if cli.conn == nil {
+				activeClose = true
+			}
+			cli.mu.Unlock()
+			if activeClose {
+				break
+			} else {
+				panic(err)
+			}
 		}
 		msgType, msgId, payload, err := unwrapMessage(data)
 		if err != nil {
@@ -225,25 +237,34 @@ func (cli *MajsoulWSClient) SelectMessage() {
 }
 
 // StartHeartBeat 模拟心跳包，间隔为秒
-func (cli *MajsoulWSClient) StartHeartBeat(intervalSec int) {
+func (cli *MajsoulWSClient) StartHeartBeat(intervalSec int, abort chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+	ticker := time.NewTicker(time.Second * time.Duration(intervalSec))
+	defer ticker.Stop()
 	for {
-		cli.Api.HeatBeat()
-		time.Sleep(time.Duration(intervalSec) * time.Second)
+		if err := cli.Api.HeatBeat(); err != nil {
+			return
+		}
+		select {
+		case <-ticker.C:
+			continue
+		case <-abort:
+			return
+		}
 	}
 }
 
 func (cli *MajsoulWSClient) Close() {
 	if cli.conn != nil {
+		cli.mu.Lock()
+		defer cli.mu.Unlock()
 		cli.conn.Close()
+		cli.reqId = 0
+		cli.reqMap = make(map[int]proto.Message)
+		for id, callback := range cli.reqChanMap {
+			close(callback)
+			delete(cli.reqChanMap, id)
+		}
+		cli.conn = nil
 	}
-	cli.mu.Lock()
-	defer cli.mu.Unlock()
-	cli.reqId = 0
-	cli.reqMap = nil
-	for id, callback := range cli.reqChanMap {
-		close(callback)
-		delete(cli.reqChanMap, id)
-	}
-	cli.reqChanMap = nil
-	cli.conn = nil
 }
